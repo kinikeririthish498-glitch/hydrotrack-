@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💧 HydroTrack Pro</title>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+background:linear-gradient(135deg,#00c6ff,#0072ff);
+min-height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+padding:20px;
+transition:0.3s;
+}
+
+.container{
+background:white;
+width:400px;
+max-width:100%;
+padding:25px;
+border-radius:20px;
+box-shadow:0 10px 30px rgba(0,0,0,.2);
+text-align:center;
+}
+
+h1{
+color:#0072ff;
+margin-bottom:15px;
+}
+
+.goal{
+margin:10px 0;
+}
+
+input{
+padding:10px;
+width:80px;
+text-align:center;
+border-radius:8px;
+border:1px solid #ccc;
+}
+
+.progress-container{
+width:100%;
+height:25px;
+background:#ddd;
+border-radius:20px;
+overflow:hidden;
+margin:15px 0;
+}
+
+.progress-bar{
+height:100%;
+width:0%;
+background:linear-gradient(90deg,#00c6ff,#00f2fe);
+transition:.5s;
+box-shadow:0 0 12px #00c6ff;
+}
+
+.water-count{
+font-size:22px;
+font-weight:bold;
+margin:15px 0;
+}
+
+button{
+padding:12px 18px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+margin:5px;
+color:white;
+font-size:15px;
+transition:.3s;
+}
+
+button:hover{
+transform:translateY(-2px);
+}
+
+.add{
+background:#00b894;
+}
+
+.reset{
+background:#e74c3c;
+}
+
+.start{
+background:#0984e3;
+}
+
+.darkbtn{
+background:#2d3436;
+}
+
+#percentage{
+font-weight:bold;
+margin:10px 0;
+}
+
+#badge{
+font-size:18px;
+color:#f39c12;
+margin-bottom:10px;
+}
+
+.dark{
+background:#121212;
+}
+
+.dark .container{
+background:#1f1f1f;
+color:white;
+}
+
+.dark h1{
+color:#4da3ff;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>💧 HydroTrack Pro</h1>
+
+<div class="goal">
+Daily Goal:
+<input type="number" id="goal" value="8" min="1">
+Glasses
+</div>
+
+<div class="progress-container">
+<div class="progress-bar" id="progressBar"></div>
+</div>
+
+<div class="water-count">
+<span id="count">0</span> /
+<span id="goalDisplay">8</span> Glasses
+</div>
+
+<p id="percentage">0% Completed</p>
+
+<p id="badge"></p>
+
+<h3>🔥 Streak:
+<span id="streak">0</span> days
+</h3>
+
+<br>
+
+<button class="add" onclick="addGlass()">+ Drink Water</button>
+<button class="reset" onclick="resetData()">Reset</button>
+
+<br><br>
+
+Reminder every:
+<input type="number" id="minutes" value="30" min="1"> mins
+
+<br><br>
+
+<button class="start" onclick="startReminder()">Start Reminder</button>
+
+<button class="darkbtn" onclick="toggleTheme()">🌙 Dark Mode</button>
+
+<p id="status" style="margin-top:15px;"></p>
+
+</div>
+
+<script>
+
+let today = new Date().toDateString();
+
+if(localStorage.getItem("lastDate") !== today){
+localStorage.setItem("lastDate", today);
+localStorage.setItem("waterCount", 0);
+}
+
+let waterCount =
+parseInt(localStorage.getItem("waterCount")) || 0;
+
+const goalInput =
+document.getElementById("goal");
+
+goalInput.value =
+localStorage.getItem("goal") || 8;
+
+function updateUI(){
+
+let goal = parseInt(goalInput.value);
+
+document.getElementById("goalDisplay").innerText = goal;
+document.getElementById("count").innerText = waterCount;
+
+let percent =
+Math.min((waterCount / goal) * 100,100);
+
+document.getElementById("progressBar").style.width =
+percent + "%";
+
+document.getElementById("percentage").innerText =
+Math.round(percent) + "% Completed";
+
+localStorage.setItem("waterCount", waterCount);
+
+let badge="";
+
+if(waterCount >= goal){
+badge="🏆 Goal Crusher";
+}
+else if(waterCount >= goal/2){
+badge="🔥 Halfway Hero";
+}
+
+document.getElementById("badge").innerText =
+badge;
+
+if(waterCount >= goal){
+saveStreak();
+}
+}
+
+goalInput.addEventListener("input",()=>{
+localStorage.setItem("goal",goalInput.value);
+updateUI();
+});
+
+function addGlass(){
+waterCount++;
+updateUI();
+}
+
+function resetData(){
+waterCount=0;
+localStorage.setItem("waterCount",0);
+updateUI();
+}
+
+function saveStreak(){
+
+if(!localStorage.getItem("goalDoneToday")){
+
+let streak =
+parseInt(localStorage.getItem("streak")) || 0;
+
+streak++;
+
+localStorage.setItem("streak",streak);
+localStorage.setItem("goalDoneToday","yes");
+
+document.getElementById("streak").innerText =
+streak;
+
+setTimeout(()=>{
+alert("🎉 Goal Achieved!");
+},200);
+}
+}
+
+if(localStorage.getItem("streakDate") !== today){
+localStorage.removeItem("goalDoneToday");
+localStorage.setItem("streakDate",today);
+}
+
+document.getElementById("streak").innerText =
+localStorage.getItem("streak") || 0;
+
+function toggleTheme(){
+
+document.body.classList.toggle("dark");
+
+localStorage.setItem(
+"theme",
+document.body.classList.contains("dark")
+);
+}
+
+if(localStorage.getItem("theme")==="true"){
+document.body.classList.add("dark");
+}
+
+let reminder;
+
+function startReminder(){
+
+let mins =
+document.getElementById("minutes").value;
+
+if(Notification.permission !== "granted"){
+Notification.requestPermission();
+}
+
+clearInterval(reminder);
+
+reminder = setInterval(()=>{
+
+if(Notification.permission==="granted"){
+
+new Notification("💧 Drink Water!",{
+body:"Stay hydrated and drink a glass."
+});
+}
+
+alert("💧 Time to drink water!");
+
+},mins*60*1000);
+
+document.getElementById("status").innerText =
+"Reminder active every " + mins + " minute(s)";
+}
+
+updateUI();
+
+</script>
+
+</body>
+</html>
