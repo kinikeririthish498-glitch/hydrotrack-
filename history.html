@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>HydroTrack History</title>
+<style>
+body{
+font-family:Arial;
+background:#f4f4f4;
+padding:20px;
+}
+
+.container{
+background:white;
+padding:20px;
+border-radius:10px;
+max-width:500px;
+margin:auto;
+}
+
+h1{
+color:#0072ff;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:15px;
+}
+
+th,td{
+border:1px solid #ddd;
+padding:10px;
+text-align:center;
+}
+
+th{
+background:#0072ff;
+color:white;
+}
+
+a{
+display:inline-block;
+margin-top:15px;
+text-decoration:none;
+color:white;
+background:#0072ff;
+padding:10px 15px;
+border-radius:5px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>📜 Water History</h1>
+
+<table id="historyTable">
+<tr>
+<th>Date</th>
+<th>Glasses</th>
+</tr>
+</table>
+
+index.html🏠 Back Home</a>
+
+</div>
+
+<script>
+
+let history =
+JSON.parse(localStorage.getItem("history")) || {};
+
+let table =
+document.getElementById("historyTable");
+
+for(let date in history){
+
+let row = table.insertRow();
+
+row.insertCell(0).innerText = date;
+row.insertCell(1).innerText = history[date];
+
+}
+
+</script>
+
+</body>
+</html>
