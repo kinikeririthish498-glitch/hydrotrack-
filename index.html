@@ -1,463 +1,550 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HydroTrack - Water Reminder</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AquaAlert - Smart Cloud Water Reminder</title>
 
-https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0ea5e9',
+            darkBg: '#0f172a',
+            darkCard: '#1e293b'
+          }
+        }
+      }
+    }
+  </script>
 
-<style>
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:'Poppins',sans-serif;
-}
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-body{
-background:linear-gradient(135deg,#e6f7ff,#cceeff);
-min-height:100vh;
-display:flex;
-justify-content:center;
-align-items:center;
-padding:20px;
-}
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { 
+      getAuth, 
+      GoogleAuthProvider, 
+      signInWithPopup, 
+      signOut, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { 
+      getFirestore, 
+      doc, 
+      getDoc, 
+      setDoc, 
+      collection, 
+      addDoc, 
+      query, 
+      where, 
+      orderBy, 
+      onSnapshot, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-.phone{
-width:380px;
-max-width:100%;
-background:white;
-border-radius:30px;
-padding:20px;
-box-shadow:0 20px 40px rgba(0,0,0,0.15);
-}
+    // --- PASTE YOUR FIREBASE CONFIG HERE ---
+    const firebaseConfig = {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
-.header{
-display:flex;
-justify-content:center;
-align-items:center;
-margin-bottom:20px;
-}
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-.logo{
-font-size:32px;
-font-weight:700;
-color:#1f5d9b;
-}
+    // Global state
+    window.db = db;
+    window.auth = auth;
+    window.currentUser = null;
+    window.userData = null;
+    window.todayIntake = 0;
+    window.dailyGoal = 2500;
+    window.reminderTimer = null;
 
-.logo span{
-color:#56c4ff;
-}
+    // Web Audio Synthesizer for Ringtones
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    window.playRingtone = function(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
 
-.card{
-background:white;
-border-radius:25px;
-padding:20px;
-box-shadow:0 10px 25px rgba(0,0,0,.08);
-text-align:center;
-}
+      if (type === 'drop') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(1000, now + 0.15);
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      } else if (type === 'chime') {
+        [523.25, 659.25, 783.99].forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.2, now + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.4);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + idx * 0.1);
+          osc.stop(now + idx * 0.1 + 0.4);
+        });
+      } else if (type === 'bell') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        gain.gain.setValueAtTime(0.6, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.8);
+      } else if (type === 'beep') {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(600, now);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      }
+    };
 
-.stats{
-margin-bottom:15px;
-}
+    // Google Sign In
+    window.loginWithGoogle = async function() {
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (err) {
+        console.error(err);
+        alert('Authentication failed: ' + err.message);
+      }
+    };
 
-.stats h4{
-font-weight:500;
-color:#666;
-}
+    window.logout = async function() {
+      await signOut(auth);
+      location.reload();
+    };
 
-.stats h2{
-margin-top:8px;
-}
+    // Auth State
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        window.currentUser = user;
+        document.getElementById('auth-logged-out').classList.add('hidden');
+        document.getElementById('auth-logged-in').classList.remove('hidden');
+        document.getElementById('app-content').classList.remove('hidden');
 
-.circle-wrap{
-display:flex;
-justify-content:center;
-position:relative;
-margin:15px 0;
-}
+        // Fetch User Profile from Firestore
+        const userDocRef = doc(db, 'users', user.uid);
+        const userSnap = await getDoc(userDocRef);
 
-svg{
-transform:rotate(-90deg);
-}
+        if (!userSnap.exists() || !userSnap.data().name) {
+          // Open Name Prompt Modal
+          document.getElementById('name-modal').classList.remove('hidden');
+          document.getElementById('user-name-input').value = user.displayName || '';
+        } else {
+          loadUserData(userSnap.data());
+        }
 
-.progress-bg{
-fill:none;
-stroke:#e3e3e3;
-stroke-width:14;
-}
+        listenToTodayIntake(user.uid);
+        listenToHistory(user.uid);
+      } else {
+        window.currentUser = null;
+        document.getElementById('auth-logged-out').classList.remove('hidden');
+        document.getElementById('auth-logged-in').classList.add('hidden');
+        document.getElementById('app-content').classList.add('hidden');
+      }
+    });
 
-.progress{
-fill:none;
-stroke:#53c6ff;
-stroke-width:14;
-stroke-linecap:round;
-transition:.5s;
-}
+    window.saveUserName = async function() {
+      const name = document.getElementById('user-name-input').value.trim();
+      if (!name) return alert('Please enter your name');
 
-.center-text{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-font-size:28px;
-font-weight:bold;
-color:#1f5d9b;
-}
+      const userDocRef = doc(db, 'users', window.currentUser.uid);
+      const defaultData = {
+        name: name,
+        email: window.currentUser.email,
+        dailyGoal: 2500,
+        reminderInterval: 60,
+        ringtone: 'drop',
+        darkMode: false,
+        notificationsEnabled: true
+      };
 
-.controls{
-display:flex;
-justify-content:space-around;
-margin-top:15px;
-}
+      await setDoc(userDocRef, defaultData, { merge: true });
+      document.getElementById('name-modal').classList.add('hidden');
+      loadUserData(defaultData);
+    };
 
-.btn-group{
-text-align:center;
-}
+    function loadUserData(data) {
+      window.userData = data;
+      document.getElementById('user-display-name').innerText = data.name || 'Friend';
+      document.getElementById('daily-goal-text').innerText = `${data.dailyGoal || 2500} ml`;
+      window.dailyGoal = data.dailyGoal || 2500;
 
-.circle-btn{
-width:60px;
-height:60px;
-border:none;
-border-radius:50%;
-font-size:30px;
-cursor:pointer;
-background:#50c5ff;
-color:white;
-box-shadow:0 8px 17px rgba(0,0,0,0.15);
-}
+      // Apply settings
+      if (data.darkMode) {
+        document.documentElement.classList.add('dark');
+        document.getElementById('dark-mode-toggle').checked = true;
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.getElementById('dark-mode-toggle').checked = false;
+      }
 
-.minus{
-background:#ddd;
-color:#333;
-margin-top:10px;
-}
+      document.getElementById('ringtone-select').value = data.ringtone || 'drop';
+      document.getElementById('interval-input').value = data.reminderInterval || 60;
+      document.getElementById('notif-toggle').checked = data.notificationsEnabled ?? true;
 
-.ml{
-margin-top:8px;
-font-weight:600;
-}
+      startReminderTimer();
+    }
 
-.goal-box{
-margin-top:20px;
-}
+    // Realtime Listener for Today's intake
+    function listenToTodayIntake(userId) {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
 
-.goal-box input{
-padding:10px;
-width:120px;
-border-radius:10px;
-border:1px solid #ccc;
-text-align:center;
-}
+      const logsRef = collection(db, 'users', userId, 'intake_logs');
+      const q = query(logsRef, where('timestamp', '>=', startOfDay));
 
-.goal-box button{
-padding:10px 12px;
-border:none;
-background:#4abfff;
-color:white;
-border-radius:10px;
-cursor:pointer;
-}
+      onSnapshot(q, (snapshot) => {
+        let total = 0;
+        snapshot.forEach((doc) => {
+          total += doc.data().amount || 0;
+        });
+        window.todayIntake = total;
+        updateUI();
+      });
+    }
 
-.history{
-margin-top:30px;
-}
+    function updateUI() {
+      document.getElementById('current-intake-text').innerText = `${window.todayIntake} ml`;
+      const percentage = Math.min(100, Math.round((window.todayIntake / window.dailyGoal) * 100));
+      document.getElementById('progress-percentage').innerText = `${percentage}%`;
 
-.history h3{
-text-align:center;
-margin-bottom:10px;
-}
+      // Update ring animation
+      const circle = document.getElementById('progress-ring-circle');
+      const circumference = 2 * Math.PI * 88; // radius 88
+      const offset = circumference - (percentage / 100) * circumference;
+      circle.style.strokeDashoffset = offset;
+    }
 
-.bars{
-height:140px;
-display:flex;
-justify-content:space-between;
-align-items:flex-end;
-margin-top:15px;
-}
+    window.logWater = async function(amount) {
+      if (!window.currentUser) return;
+      window.playRingtone(window.userData?.ringtone || 'drop');
 
-.bar{
-width:30px;
-border-radius:10px 10px 0 0;
-background:linear-gradient(#99ddff,#43c4ff);
-display:flex;
-align-items:flex-end;
-justify-content:center;
-color:#fff;
-font-size:11px;
-}
+      const logsRef = collection(db, 'users', window.currentUser.uid, 'intake_logs');
+      await addDoc(logsRef, {
+        amount: Number(amount),
+        timestamp: new Date()
+      });
+    };
 
-.day{
-text-align:center;
-font-size:12px;
-margin-top:5px;
-}
+    // History Listener
+    function listenToHistory(userId) {
+      const logsRef = collection(db, 'users', userId, 'intake_logs');
+      const q = query(logsRef, orderBy('timestamp', 'desc'));
 
-.reminder{
-margin-top:25px;
-background:#eefaff;
-padding:15px;
-border-radius:15px;
-text-align:center;
-}
+      onSnapshot(q, (snapshot) => {
+        const historyContainer = document.getElementById('history-list');
+        historyContainer.innerHTML = '';
 
-.reminder button{
-margin-top:10px;
-padding:10px 15px;
-border:none;
-background:#2196f3;
-color:white;
-border-radius:10px;
-cursor:pointer;
-}
+        if (snapshot.empty) {
+          historyContainer.innerHTML = `<div class="text-gray-400 text-center py-6">No logs yet. Drink some water! 💧</div>`;
+          return;
+        }
 
-.footer{
-margin-top:20px;
-display:flex;
-justify-content:space-around;
-padding-top:15px;
-border-top:1px solid #eee;
-color:#777;
-font-size:14px;
-}
+        snapshot.forEach((doc) => {
+          const item = doc.data();
+          const date = item.timestamp?.toDate ? item.timestamp.toDate() : new Date(item.timestamp);
+          const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-.water-drop{
-font-size:50px;
-}
-</style>
+          const row = document.createElement('div');
+          row.className = 'flex justify-between items-center bg-gray-100 dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700';
+          row.innerHTML = `
+            <div class="flex items-center space-x-3">
+              <span class="text-blue-500 font-bold text-lg">💧 +${item.amount}ml</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">${dateStr}</span>
+            </div>
+            <span class="text-sm font-semibold text-gray-600 dark:text-gray-300">${timeStr}</span>
+          `;
+          historyContainer.appendChild(row);
+        });
+      });
+    }
+
+    // Reminders & Notification Engine
+    function startReminderTimer() {
+      if (window.reminderTimer) clearInterval(window.reminderTimer);
+      const minutes = window.userData?.reminderInterval || 60;
+      
+      window.reminderTimer = setInterval(() => {
+        if (!window.userData?.notificationsEnabled) return;
+
+        // Play Tone
+        window.playRingtone(window.userData?.ringtone || 'drop');
+
+        // Trigger Notification
+        if (Notification.permission === 'granted') {
+          new Notification('💧 AquaAlert Time!', {
+            body: `Hey ${window.userData?.name || 'there'}, it's time to drink water and stay refreshed!`,
+            icon: 'https://cdn-icons-png.flaticon.com/512/3105/3105807.png'
+          });
+        }
+      }, minutes * 60 * 1000);
+    }
+
+    // Save Settings
+    window.saveSettings = async function() {
+      const isDark = document.getElementById('dark-mode-toggle').checked;
+      const ringtone = document.getElementById('ringtone-select').value;
+      const interval = parseInt(document.getElementById('interval-input').value) || 60;
+      const notifs = document.getElementById('notif-toggle').checked;
+
+      if (notifs && Notification.permission !== 'granted') {
+        await Notification.requestPermission();
+      }
+
+      const userDocRef = doc(db, 'users', window.currentUser.uid);
+      const updated = {
+        darkMode: isDark,
+        ringtone: ringtone,
+        reminderInterval: interval,
+        notificationsEnabled: notifs
+      };
+
+      await setDoc(userDocRef, updated, { merge: true });
+      loadUserData({ ...window.userData, ...updated });
+      document.getElementById('settings-modal').classList.add('hidden');
+    };
+
+    // Ask Gemini Support / Diagnostics
+    window.askGemini = async function() {
+      const prompt = document.getElementById('gemini-prompt').value.trim();
+      if (!prompt) return;
+
+      const chatContainer = document.getElementById('gemini-chat-log');
+      chatContainer.innerHTML += `
+        <div class="mb-2 text-right"><span class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg inline-block">${prompt}</span></div>
+        <div class="mb-2 text-left"><span class="bg-gray-200 dark:bg-slate-700 text-sm px-3 py-1.5 rounded-lg inline-block animate-pulse text-gray-500">Gemini is thinking...</span></div>
+      `;
+      document.getElementById('gemini-prompt').value = '';
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+
+      try {
+        const res = await fetch('/api/gemini/support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: prompt,
+            userContext: {
+              name: window.userData?.name,
+              todayIntake: window.todayIntake,
+              dailyGoal: window.dailyGoal
+            }
+          })
+        });
+
+        const data = await res.json();
+        chatContainer.lastElementChild.innerHTML = `<span class="bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-gray-100 text-sm px-3 py-1.5 rounded-lg inline-block leading-relaxed">${data.reply || data.error}</span>`;
+      } catch (err) {
+        chatContainer.lastElementChild.innerHTML = `<span class="bg-red-100 text-red-700 text-sm px-3 py-1.5 rounded-lg inline-block">Error getting answer from AI.</span>`;
+      }
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    };
+  </script>
 </head>
 
-<body>
-
-<div class="phone">
-
-<div class="header">
-<div class="logo">Hydro<span>Track</span></div>
-</div>
-
-<div class="card">
-
-<div class="stats">
-<h4>TODAY'S INTAKE</h4>
-<h2><span id="currentLitres">0</span>L /
-<span id="goalLitres">3</span>L GOAL</h2>
-</div>
-
-<div class="circle-wrap">
-
-<svg width="220" height="220">
-<circle class="progress-bg" cx="110" cy="110" r="90"></circle>
-
-<circle
-class="progress"
-cx="110"
-cy="110"
-r="90"
-stroke-dasharray="565"
-stroke-dashoffset="565"
-id="progressCircle">
-</circle>
-</svg>
-
-<div class="center-text">
-💧<br>
-<span id="percent">0%</span>
-</div>
-</div>
-
-<div class="controls">
-
-<div class="btn-group">
-<button class="circle-btn" onclick="addWater(250)">+</button>
-<div class="ml">250ml</div>
-
-<button class="circle-btn minus"
-onclick="removeWater(250)">−</button>
-</div>
-
-<div class="btn-group">
-<button class="circle-btn" onclick="addWater(500)">+</button>
-<div class="ml">500ml</div>
-
-<button class="circle-btn minus"
-onclick="removeWater(500)">−</button>
-</div>
-
-</div>
-
-<div class="goal-box">
-<input type="number" id="goalInput" value="3000">
-<button onclick="setGoal()">Set Goal (ml)</button>
-</div>
-
-</div>
-
-<div class="history">
-<h3>Last 7 Days</h3>
-
-<div class="bars" id="historyBars"></div>
-</div>
-
-<div class="reminder">
-<h3>Stay Hydrated 💦</h3>
-<p>Enable notifications every hour.</p>
-<button onclick="enableReminder()">
-Enable Reminder
-</button>
-</div>
-
-<div class="footer">
-<div>⚙ Settings</div>
-<div>📅 History</div>
-<div>ℹ Info</div>
-</div>
-
-</div>
-
-<script>
-
-let intake =
-parseInt(localStorage.getItem("intake")) || 0;
-
-let goal =
-parseInt(localStorage.getItem("goal")) || 3000;
-
-document.getElementById("goalInput").value = goal;
-
-function updateUI() {
-
-let percent = Math.min(
-(Math.round((intake/goal)*100)),100);
-
-let circumference = 565;
-
-let offset =
-circumference -
-(percent/100)*circumference;
-
-document.getElementById("progressCircle")
-.style.strokeDashoffset = offset;
-
-document.getElementById("percent")
-.innerText = percent + "%";
-
-document.getElementById("currentLitres")
-.innerText = (intake/1000).toFixed(1);
-
-document.getElementById("goalLitres")
-.innerText = (goal/1000).toFixed(1);
-
-localStorage.setItem("intake", intake);
-localStorage.setItem("goal", goal);
-}
-
-function addWater(amount){
-intake += amount;
-saveHistory(amount);
-updateUI();
-}
-
-function removeWater(amount){
-intake = Math.max(0,intake-amount);
-updateUI();
-}
-
-function setGoal(){
-goal =
-parseInt(document.getElementById("goalInput").value);
-updateUI();
-}
-
-function saveHistory(amount){
-
-let history =
-JSON.parse(localStorage.getItem("waterHistory")) || [];
-
-let today = new Date().toLocaleDateString();
-
-let existing =
-history.find(item=>item.date===today);
-
-if(existing){
-existing.amount += amount;
-}else{
-history.push({
-date:today,
-amount:amount
-});
-}
-
-localStorage.setItem(
-"waterHistory",
-JSON.stringify(history)
-);
-
-renderHistory();
-}
-
-function renderHistory(){
-
-let container =
-document.getElementById("historyBars");
-
-container.innerHTML="";
-
-let history =
-JSON.parse(localStorage.getItem("waterHistory")) || [];
-
-let last7 = history.slice(-7);
-
-last7.forEach(item=>{
-
-let h =
-Math.max(25,
-(item.amount/3000)*130);
-
-let box =
-document.createElement("div");
-
-box.innerHTML=
-`
-<div class="bar"
-style="height:${h}px;">
-</div>
-<div class="day">
-${item.date.split('/')[0]}
-</div>
-`;
-
-container.appendChild(box);
-});
-}
-
-async function enableReminder() {
-
-if(Notification.permission !== "granted"){
-await Notification.requestPermission();
-}
-
-setInterval(()=>{
-
-if(Notification.permission==="granted"){
-
-new Notification(
-"💧 Time to Drink Water!",
-{
-body:"Stay hydrated and healthy."
-}
-);
-
-}
-},3600000);
-
-alert("Hourly Reminder Activated");
-}
-
-updateUI();
-renderHistory();
-
-</script>
-
+<body class="bg-slate-50 text-slate-900 dark:bg-darkBg dark:text-slate-100 transition-colors duration-200 min-h-screen font-sans flex flex-col items-center">
+
+  <!-- Navigation Bar -->
+  <nav class="w-full max-w-2xl flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-800">
+    <div class="flex items-center space-x-2">
+      <i data-lucide="droplet" class="text-blue-500 w-7 h-7"></i>
+      <h1 class="text-xl font-black bg-gradient-to-r from-blue-500 to-cyan-400 bg-clip-text text-transparent">AquaAlert</h1>
+    </div>
+
+    <!-- Auth Buttons -->
+    <div>
+      <div id="auth-logged-out">
+        <button onclick="window.loginWithGoogle()" class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-xl transition shadow">
+          <i data-lucide="log-in" class="w-4 h-4"></i>
+          <span>Sign In</span>
+        </button>
+      </div>
+      <div id="auth-logged-in" class="hidden flex items-center space-x-2">
+        <button onclick="document.getElementById('history-modal').classList.remove('hidden')" class="p-2.5 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-800 transition" title="History">
+          <i data-lucide="history" class="w-5 h-5 text-gray-700 dark:text-gray-200"></i>
+        </button>
+        <button onclick="document.getElementById('settings-modal').classList.remove('hidden')" class="p-2.5 rounded-xl hover:bg-gray-200 dark:hover:bg-slate-800 transition" title="Settings">
+          <i data-lucide="settings" class="w-5 h-5 text-gray-700 dark:text-gray-200"></i>
+        </button>
+        <button onclick="window.logout()" class="p-2.5 rounded-xl hover:bg-red-100 dark:hover:bg-red-950/40 text-red-500 transition" title="Logout">
+          <i data-lucide="log-out" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content Card -->
+  <main id="app-content" class="w-full max-w-md p-6 mt-4 hidden flex-1 flex flex-col items-center">
+    
+    <!-- User Welcome -->
+    <div class="text-center mb-6">
+      <h2 class="text-2xl font-bold">Hello, <span id="user-display-name" class="text-blue-500">Friend</span>! 👋</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400">Keep up the great work staying hydrated today.</p>
+    </div>
+
+    <!-- Progress Dial Visual -->
+    <div class="relative w-64 h-64 flex items-center justify-center mb-6">
+      <svg class="w-full h-full transform -rotate-90" viewBox="0 0 200 200">
+        <!-- Background Track -->
+        <circle cx="100" cy="100" r="88" class="stroke-gray-200 dark:stroke-slate-800" stroke-width="14" fill="transparent" />
+        <!-- Progress Bar -->
+        <circle id="progress-ring-circle" cx="100" cy="100" r="88" class="stroke-blue-500 transition-all duration-700 ease-out" stroke-width="14" stroke-linecap="round" fill="transparent" stroke-dasharray="552.92" stroke-dashoffset="552.92" />
+      </svg>
+      <div class="absolute flex flex-col items-center justify-center text-center">
+        <span id="progress-percentage" class="text-4xl font-extrabold text-blue-500">0%</span>
+        <span id="current-intake-text" class="text-lg font-bold mt-1">0 ml</span>
+        <span class="text-xs text-gray-400">Goal: <span id="daily-goal-text">2500 ml</span></span>
+      </div>
+    </div>
+
+    <!-- Quick Add Buttons -->
+    <div class="w-full grid grid-cols-3 gap-3 mb-6">
+      <button onclick="window.logWater(250)" class="flex flex-col items-center bg-white dark:bg-darkCard p-3 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 hover:border-blue-400 hover:scale-105 transition">
+        <span class="text-2xl">🥛</span>
+        <span class="text-sm font-semibold mt-1">+250 ml</span>
+      </button>
+      <button onclick="window.logWater(500)" class="flex flex-col items-center bg-white dark:bg-darkCard p-3 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 hover:border-blue-400 hover:scale-105 transition">
+        <span class="text-2xl">💧</span>
+        <span class="text-sm font-semibold mt-1">+500 ml</span>
+      </button>
+      <button onclick="window.logWater(750)" class="flex flex-col items-center bg-white dark:bg-darkCard p-3 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 hover:border-blue-400 hover:scale-105 transition">
+        <span class="text-2xl">🍶</span>
+        <span class="text-sm font-semibold mt-1">+750 ml</span>
+      </button>
+    </div>
+
+    <!-- Custom Intake Input -->
+    <div class="w-full flex space-x-2 bg-white dark:bg-darkCard p-2 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
+      <input id="custom-amount" type="number" placeholder="Custom ml (e.g. 300)" class="bg-transparent px-3 py-2 flex-1 focus:outline-none text-sm" />
+      <button onclick="const val = document.getElementById('custom-amount').value; if(val > 0) { window.logWater(val); document.getElementById('custom-amount').value = ''; }" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-xl text-sm transition">Add</button>
+    </div>
+  </main>
+
+  <!-- Login Landing View -->
+  <div id="auth-prompt" class="my-auto text-center px-4 max-w-sm">
+    <div class="p-6 bg-white dark:bg-darkCard rounded-3xl shadow-lg border border-gray-200 dark:border-gray-800">
+      <i data-lucide="cloud-rain" class="w-16 h-16 text-blue-500 mx-auto mb-4"></i>
+      <h2 class="text-2xl font-black mb-2">Track & Sync Anywhere</h2>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Log in with Google to sync your water progress across devices, receive sound reminders, and chat with AI.</p>
+      <button onclick="window.loginWithGoogle()" class="w-full flex justify-center items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow transition">
+        <i data-lucide="log-in" class="w-5 h-5"></i>
+        <span>Sign in with Google</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Name Prompt Modal -->
+  <div id="name-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-darkCard p-6 rounded-3xl max-w-sm w-full shadow-2xl border border-gray-200 dark:border-gray-800">
+      <h3 class="text-xl font-bold mb-2">Welcome! What's your name?</h3>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Let's personalize your hydration dashboard.</p>
+      <input id="user-name-input" type="text" placeholder="Your Name" class="w-full bg-gray-100 dark:bg-slate-800 p-3 rounded-xl mb-4 border border-gray-200 dark:border-gray-700 focus:outline-none" />
+      <button onclick="window.saveUserName()" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl">Save & Continue</button>
+    </div>
+  </div>
+
+  <!-- Settings Modal (Dark Mode, Ring Tones, Notifications, Gemini Support) -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-darkCard p-6 rounded-3xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-gray-800">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-xl font-bold flex items-center gap-2"><i data-lucide="sliders" class="w-5 h-5 text-blue-500"></i> Settings</h3>
+        <button onclick="document.getElementById('settings-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:hover:text-white">✕</button>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Dark Mode -->
+        <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl">
+          <span class="text-sm font-medium">Dark Mode</span>
+          <input id="dark-mode-toggle" type="checkbox" onchange="document.documentElement.classList.toggle('dark', this.checked)" class="w-5 h-5 accent-blue-600 cursor-pointer" />
+        </div>
+
+        <!-- Notification Toggle -->
+        <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl">
+          <span class="text-sm font-medium">Desktop Notifications</span>
+          <input id="notif-toggle" type="checkbox" class="w-5 h-5 accent-blue-600 cursor-pointer" />
+        </div>
+
+        <!-- Reminder Interval -->
+        <div class="p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl">
+          <label class="text-sm font-medium block mb-1">Reminder Interval (minutes)</label>
+          <input id="interval-input" type="number" min="5" max="240" class="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded-lg text-sm" />
+        </div>
+
+        <!-- Ring Tone Options -->
+        <div class="p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl">
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-sm font-medium">Reminder Ringtone</label>
+            <button onclick="window.playRingtone(document.getElementById('ringtone-select').value)" class="text-xs text-blue-500 hover:underline">Preview Tone 🎵</button>
+          </div>
+          <select id="ringtone-select" class="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded-lg text-sm">
+            <option value="drop">Water Drop (Default)</option>
+            <option value="chime">Gentle Chime</option>
+            <option value="bell">Soft Bell</option>
+            <option value="beep">Digital Beep</option>
+          </select>
+        </div>
+
+        <!-- Issue / AI Help Section (Powered by Gemini) -->
+        <div class="p-3 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-blue-100 dark:border-blue-900/30">
+          <label class="text-sm font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mb-1">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> Gemini AI Hydration & Issue Desk
+          </label>
+          <div id="gemini-chat-log" class="max-h-36 overflow-y-auto mb-2 p-2 bg-white dark:bg-slate-900 rounded-lg text-xs space-y-2 border border-gray-200 dark:border-gray-700">
+            <div class="text-gray-400">Ask about hydration goals, health issues, or submit questions...</div>
+          </div>
+          <div class="flex gap-2">
+            <input id="gemini-prompt" type="text" placeholder="e.g. How much water for 70kg weight?" class="flex-1 bg-white dark:bg-slate-900 border border-gray-300 dark:border-gray-700 p-2 rounded-lg text-xs" />
+            <button onclick="window.askGemini()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg text-xs font-semibold">Send</button>
+          </div>
+        </div>
+
+        <button onclick="window.saveSettings()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition mt-2">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div id="history-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white dark:bg-darkCard p-6 rounded-3xl max-w-md w-full max-h-[85vh] flex flex-col shadow-2xl border border-gray-200 dark:border-gray-800">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-bold flex items-center gap-2"><i data-lucide="history" class="w-5 h-5 text-blue-500"></i> Intake History</h3>
+        <button onclick="document.getElementById('history-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:hover:text-white">✕</button>
+      </div>
+      <div id="history-list" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
 </html>
