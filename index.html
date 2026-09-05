@@ -3,328 +3,461 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>💧 HydroTrack Pro</title>
+<title>HydroTrack - Water Reminder</title>
+
+https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap
 
 <style>
 *{
 margin:0;
 padding:0;
 box-sizing:border-box;
-font-family:Arial,sans-serif;
+font-family:'Poppins',sans-serif;
 }
 
 body{
-background:linear-gradient(135deg,#00c6ff,#0072ff);
+background:linear-gradient(135deg,#e6f7ff,#cceeff);
 min-height:100vh;
 display:flex;
 justify-content:center;
 align-items:center;
 padding:20px;
-transition:0.3s;
 }
 
-.container{
-background:white;
-width:400px;
+.phone{
+width:380px;
 max-width:100%;
-padding:25px;
-border-radius:20px;
-box-shadow:0 10px 30px rgba(0,0,0,.2);
+background:white;
+border-radius:30px;
+padding:20px;
+box-shadow:0 20px 40px rgba(0,0,0,0.15);
+}
+
+.header{
+display:flex;
+justify-content:center;
+align-items:center;
+margin-bottom:20px;
+}
+
+.logo{
+font-size:32px;
+font-weight:700;
+color:#1f5d9b;
+}
+
+.logo span{
+color:#56c4ff;
+}
+
+.card{
+background:white;
+border-radius:25px;
+padding:20px;
+box-shadow:0 10px 25px rgba(0,0,0,.08);
 text-align:center;
 }
 
-h1{
-color:#0072ff;
+.stats{
 margin-bottom:15px;
 }
 
-.goal{
-margin:10px 0;
+.stats h4{
+font-weight:500;
+color:#666;
 }
 
-input{
-padding:10px;
-width:80px;
-text-align:center;
-border-radius:8px;
-border:1px solid #ccc;
+.stats h2{
+margin-top:8px;
 }
 
-.progress-container{
-width:100%;
-height:25px;
-background:#ddd;
-border-radius:20px;
-overflow:hidden;
+.circle-wrap{
+display:flex;
+justify-content:center;
+position:relative;
 margin:15px 0;
 }
 
-.progress-bar{
-height:100%;
-width:0%;
-background:linear-gradient(90deg,#00c6ff,#00f2fe);
+svg{
+transform:rotate(-90deg);
+}
+
+.progress-bg{
+fill:none;
+stroke:#e3e3e3;
+stroke-width:14;
+}
+
+.progress{
+fill:none;
+stroke:#53c6ff;
+stroke-width:14;
+stroke-linecap:round;
 transition:.5s;
-box-shadow:0 0 12px #00c6ff;
 }
 
-.water-count{
-font-size:22px;
+.center-text{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+font-size:28px;
 font-weight:bold;
-margin:15px 0;
+color:#1f5d9b;
 }
 
-button{
-padding:12px 18px;
+.controls{
+display:flex;
+justify-content:space-around;
+margin-top:15px;
+}
+
+.btn-group{
+text-align:center;
+}
+
+.circle-btn{
+width:60px;
+height:60px;
 border:none;
+border-radius:50%;
+font-size:30px;
+cursor:pointer;
+background:#50c5ff;
+color:white;
+box-shadow:0 8px 17px rgba(0,0,0,0.15);
+}
+
+.minus{
+background:#ddd;
+color:#333;
+margin-top:10px;
+}
+
+.ml{
+margin-top:8px;
+font-weight:600;
+}
+
+.goal-box{
+margin-top:20px;
+}
+
+.goal-box input{
+padding:10px;
+width:120px;
+border-radius:10px;
+border:1px solid #ccc;
+text-align:center;
+}
+
+.goal-box button{
+padding:10px 12px;
+border:none;
+background:#4abfff;
+color:white;
 border-radius:10px;
 cursor:pointer;
-margin:5px;
-color:white;
-font-size:15px;
-transition:.3s;
 }
 
-button:hover{
-transform:translateY(-2px);
+.history{
+margin-top:30px;
 }
 
-.add{
-background:#00b894;
-}
-
-.reset{
-background:#e74c3c;
-}
-
-.start{
-background:#0984e3;
-}
-
-.darkbtn{
-background:#2d3436;
-}
-
-#percentage{
-font-weight:bold;
-margin:10px 0;
-}
-
-#badge{
-font-size:18px;
-color:#f39c12;
+.history h3{
+text-align:center;
 margin-bottom:10px;
 }
 
-.dark{
-background:#121212;
+.bars{
+height:140px;
+display:flex;
+justify-content:space-between;
+align-items:flex-end;
+margin-top:15px;
 }
 
-.dark .container{
-background:#1f1f1f;
+.bar{
+width:30px;
+border-radius:10px 10px 0 0;
+background:linear-gradient(#99ddff,#43c4ff);
+display:flex;
+align-items:flex-end;
+justify-content:center;
+color:#fff;
+font-size:11px;
+}
+
+.day{
+text-align:center;
+font-size:12px;
+margin-top:5px;
+}
+
+.reminder{
+margin-top:25px;
+background:#eefaff;
+padding:15px;
+border-radius:15px;
+text-align:center;
+}
+
+.reminder button{
+margin-top:10px;
+padding:10px 15px;
+border:none;
+background:#2196f3;
 color:white;
+border-radius:10px;
+cursor:pointer;
 }
 
-.dark h1{
-color:#4da3ff;
+.footer{
+margin-top:20px;
+display:flex;
+justify-content:space-around;
+padding-top:15px;
+border-top:1px solid #eee;
+color:#777;
+font-size:14px;
+}
+
+.water-drop{
+font-size:50px;
 }
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<div class="phone">
 
-<h1>💧 HydroTrack Pro</h1>
-
-<div class="goal">
-Daily Goal:
-<input type="number" id="goal" value="8" min="1">
-Glasses
+<div class="header">
+<div class="logo">Hydro<span>Track</span></div>
 </div>
 
-<div class="progress-container">
-<div class="progress-bar" id="progressBar"></div>
+<div class="card">
+
+<div class="stats">
+<h4>TODAY'S INTAKE</h4>
+<h2><span id="currentLitres">0</span>L /
+<span id="goalLitres">3</span>L GOAL</h2>
 </div>
 
-<div class="water-count">
-<span id="count">0</span> /
-<span id="goalDisplay">8</span> Glasses
+<div class="circle-wrap">
+
+<svg width="220" height="220">
+<circle class="progress-bg" cx="110" cy="110" r="90"></circle>
+
+<circle
+class="progress"
+cx="110"
+cy="110"
+r="90"
+stroke-dasharray="565"
+stroke-dashoffset="565"
+id="progressCircle">
+</circle>
+</svg>
+
+<div class="center-text">
+💧<br>
+<span id="percent">0%</span>
+</div>
 </div>
 
-<p id="percentage">0% Completed</p>
+<div class="controls">
 
-<p id="badge"></p>
+<div class="btn-group">
+<button class="circle-btn" onclick="addWater(250)">+</button>
+<div class="ml">250ml</div>
 
-<h3>🔥 Streak:
-<span id="streak">0</span> days
-</h3>
+<button class="circle-btn minus"
+onclick="removeWater(250)">−</button>
+</div>
 
-<br>
+<div class="btn-group">
+<button class="circle-btn" onclick="addWater(500)">+</button>
+<div class="ml">500ml</div>
 
-<button class="add" onclick="addGlass()">+ Drink Water</button>
-<button class="reset" onclick="resetData()">Reset</button>
+<button class="circle-btn minus"
+onclick="removeWater(500)">−</button>
+</div>
 
-<br><br>
+</div>
 
-Reminder every:
-<input type="number" id="minutes" value="30" min="1"> mins
+<div class="goal-box">
+<input type="number" id="goalInput" value="3000">
+<button onclick="setGoal()">Set Goal (ml)</button>
+</div>
 
-<br><br>
+</div>
 
-<button class="start" onclick="startReminder()">Start Reminder</button>
+<div class="history">
+<h3>Last 7 Days</h3>
 
-<button class="darkbtn" onclick="toggleTheme()">🌙 Dark Mode</button>
+<div class="bars" id="historyBars"></div>
+</div>
 
-<p id="status" style="margin-top:15px;"></p>
+<div class="reminder">
+<h3>Stay Hydrated 💦</h3>
+<p>Enable notifications every hour.</p>
+<button onclick="enableReminder()">
+Enable Reminder
+</button>
+</div>
+
+<div class="footer">
+<div>⚙ Settings</div>
+<div>📅 History</div>
+<div>ℹ Info</div>
+</div>
 
 </div>
 
 <script>
 
-let today = new Date().toDateString();
+let intake =
+parseInt(localStorage.getItem("intake")) || 0;
 
-if(localStorage.getItem("lastDate") !== today){
-localStorage.setItem("lastDate", today);
-localStorage.setItem("waterCount", 0);
+let goal =
+parseInt(localStorage.getItem("goal")) || 3000;
+
+document.getElementById("goalInput").value = goal;
+
+function updateUI() {
+
+let percent = Math.min(
+(Math.round((intake/goal)*100)),100);
+
+let circumference = 565;
+
+let offset =
+circumference -
+(percent/100)*circumference;
+
+document.getElementById("progressCircle")
+.style.strokeDashoffset = offset;
+
+document.getElementById("percent")
+.innerText = percent + "%";
+
+document.getElementById("currentLitres")
+.innerText = (intake/1000).toFixed(1);
+
+document.getElementById("goalLitres")
+.innerText = (goal/1000).toFixed(1);
+
+localStorage.setItem("intake", intake);
+localStorage.setItem("goal", goal);
 }
 
-let waterCount =
-parseInt(localStorage.getItem("waterCount")) || 0;
-
-const goalInput =
-document.getElementById("goal");
-
-goalInput.value =
-localStorage.getItem("goal") || 8;
-
-function updateUI(){
-
-let goal = parseInt(goalInput.value);
-
-document.getElementById("goalDisplay").innerText = goal;
-document.getElementById("count").innerText = waterCount;
-
-let percent =
-Math.min((waterCount / goal) * 100,100);
-
-document.getElementById("progressBar").style.width =
-percent + "%";
-
-document.getElementById("percentage").innerText =
-Math.round(percent) + "% Completed";
-
-localStorage.setItem("waterCount", waterCount);
-
-let badge="";
-
-if(waterCount >= goal){
-badge="🏆 Goal Crusher";
-}
-else if(waterCount >= goal/2){
-badge="🔥 Halfway Hero";
-}
-
-document.getElementById("badge").innerText =
-badge;
-
-if(waterCount >= goal){
-saveStreak();
-}
-}
-
-goalInput.addEventListener("input",()=>{
-localStorage.setItem("goal",goalInput.value);
+function addWater(amount){
+intake += amount;
+saveHistory(amount);
 updateUI();
+}
+
+function removeWater(amount){
+intake = Math.max(0,intake-amount);
+updateUI();
+}
+
+function setGoal(){
+goal =
+parseInt(document.getElementById("goalInput").value);
+updateUI();
+}
+
+function saveHistory(amount){
+
+let history =
+JSON.parse(localStorage.getItem("waterHistory")) || [];
+
+let today = new Date().toLocaleDateString();
+
+let existing =
+history.find(item=>item.date===today);
+
+if(existing){
+existing.amount += amount;
+}else{
+history.push({
+date:today,
+amount:amount
 });
-
-function addGlass(){
-waterCount++;
-updateUI();
 }
-
-function resetData(){
-waterCount=0;
-localStorage.setItem("waterCount",0);
-updateUI();
-}
-
-function saveStreak(){
-
-if(!localStorage.getItem("goalDoneToday")){
-
-let streak =
-parseInt(localStorage.getItem("streak")) || 0;
-
-streak++;
-
-localStorage.setItem("streak",streak);
-localStorage.setItem("goalDoneToday","yes");
-
-document.getElementById("streak").innerText =
-streak;
-
-setTimeout(()=>{
-alert("🎉 Goal Achieved!");
-},200);
-}
-}
-
-if(localStorage.getItem("streakDate") !== today){
-localStorage.removeItem("goalDoneToday");
-localStorage.setItem("streakDate",today);
-}
-
-document.getElementById("streak").innerText =
-localStorage.getItem("streak") || 0;
-
-function toggleTheme(){
-
-document.body.classList.toggle("dark");
 
 localStorage.setItem(
-"theme",
-document.body.classList.contains("dark")
+"waterHistory",
+JSON.stringify(history)
 );
+
+renderHistory();
 }
 
-if(localStorage.getItem("theme")==="true"){
-document.body.classList.add("dark");
+function renderHistory(){
+
+let container =
+document.getElementById("historyBars");
+
+container.innerHTML="";
+
+let history =
+JSON.parse(localStorage.getItem("waterHistory")) || [];
+
+let last7 = history.slice(-7);
+
+last7.forEach(item=>{
+
+let h =
+Math.max(25,
+(item.amount/3000)*130);
+
+let box =
+document.createElement("div");
+
+box.innerHTML=
+`
+<div class="bar"
+style="height:${h}px;">
+</div>
+<div class="day">
+${item.date.split('/')[0]}
+</div>
+`;
+
+container.appendChild(box);
+});
 }
 
-let reminder;
-
-function startReminder(){
-
-let mins =
-document.getElementById("minutes").value;
+async function enableReminder() {
 
 if(Notification.permission !== "granted"){
-Notification.requestPermission();
+await Notification.requestPermission();
 }
 
-clearInterval(reminder);
-
-reminder = setInterval(()=>{
+setInterval(()=>{
 
 if(Notification.permission==="granted"){
 
-new Notification("💧 Drink Water!",{
-body:"Stay hydrated and drink a glass."
-});
+new Notification(
+"💧 Time to Drink Water!",
+{
+body:"Stay hydrated and healthy."
 }
+);
 
-alert("💧 Time to drink water!");
+}
+},3600000);
 
-},mins*60*1000);
-
-document.getElementById("status").innerText =
-"Reminder active every " + mins + " minute(s)";
+alert("Hourly Reminder Activated");
 }
 
 updateUI();
+renderHistory();
 
 </script>
 
 </body>
-<button id="historyBtn">History</button>
-
+</html>
